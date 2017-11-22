@@ -51,6 +51,7 @@ int gnExprBrcdDtctInitFlag = 0;
 int gnCodeSymbology = 0;
 int gnRglCodeCnt = 0;
 int gnCodeDgtNum = 0;
+int gnCodeDgtNumExt = 0;
 int gnCodeValidity = 0;
 int gnCodeValidityExt = 0;
 
@@ -771,6 +772,13 @@ int algorithm_setparams(AlgorithmParamSet * paramset)
 #endif
 #endif
 
+	gnCodeDgtNumExt = paramset->nCodeDgtNumExt;
+#ifdef _WRITE_LOG
+#ifdef _LOG_TRACE
+	Write_Log(LOG_TYPE_INFO, "SET- Algorithm param setting. code_digit <== 0x%x", gnCodeSymbology);
+#endif
+#endif
+
 	gnCodeValidity = paramset->nCodeValidity;
 #ifdef _WRITE_LOG
 #ifdef _LOG_TRACE
@@ -796,6 +804,7 @@ void algorithm_resetparams()
 	gnRglCodeCnt = 0;
 	gnCodeSymbology = 0;
 	gnCodeDgtNum = 0;
+	gnCodeDgtNumExt = 0;
 	gnCodeValidity = 0;
 	gnCodeValidityExt = 0;
 	return;
