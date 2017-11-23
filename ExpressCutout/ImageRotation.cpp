@@ -100,47 +100,21 @@ int RotateImage(unsigned char* ucSrcImg, short sSrcImgWidth, short sSrcImgHeight
 	int nZoomW = 0, nZoomH = 0;
 	RyuPoint offset, zoomCorner[4];
 
-	if(1 != gnImgRttInitFlag) {
-#ifdef _WRITE_LOG
-		Write_Log(LOG_TYPE_ERROR, "错误号: -109180101. RotateImage run without init.");
-#ifdef _LOG_TRACE
-		Write_Log(LOG_TYPE_INFO, "ERROR- 错误号: -109180101. RotateImage run without init.");
+	if(gnImgRttInitFlag==0 || sSrcImgHeight>gnImgRttMaxHeight || sSrcImgWidth>gnImgRttMaxWidth 
+		|| cAngle < 0 || cAngle > 360)
+	{
+#ifdef	_PRINT_PROMPT
+		printf("ERROR! Invalid input of RotateImage\n");
 #endif
-#endif
-		return -109180101;
-	}
-
-	if(sSrcImgHeight>gnImgRttMaxHeight || sSrcImgWidth>gnImgRttMaxWidth) {
-#ifdef _WRITE_LOG
-		Write_Log(LOG_TYPE_ERROR, "错误号: -109180102. RotateImage wid=%d, max_wid=%d; hei=%d, max_hei=%d",
-			sSrcImgWidth, gnImgRttMaxWidth, sSrcImgHeight, gnImgRttMaxHeight);
-#ifdef _LOG_TRACE
-		Write_Log(LOG_TYPE_INFO, "ERROR- 错误号: -109180102. RotateImage wid=%d, max_wid=%d; hei=%d, max_hei=%d",
-			sSrcImgWidth, gnImgRttMaxWidth, sSrcImgHeight, gnImgRttMaxHeight);
-#endif
-#endif
-		return -109180102;
-	}
-
-	if(cAngle < 0 || cAngle > 360) {
-#ifdef _WRITE_LOG
-		Write_Log(LOG_TYPE_ERROR, "错误号: -109180103. RotateImage cAngle invalid=%d", cAngle);
-#ifdef _LOG_TRACE
-		Write_Log(LOG_TYPE_INFO, "ERROR- 错误号: -109180103. RotateImage cAngle invalid=%d", cAngle);
-#endif
-#endif
-		return -109180103;
+		return -1;
 	}
 
 	/*****************************0、取出并放大条码区域图像******************************/
 	status = GetImageRoiZoomInData(ucSrcImg, (int)sSrcImgWidth, (int)sSrcImgHeight, corner, cZoom, 
 				gucImgRttZoom, &nZoomW, &nZoomH, &offset);
 	if(1 != status) {
-#ifdef _WRITE_LOG
-		Write_Log(LOG_TYPE_ERROR, "警告: -109180104. RotateImage GetImageRoi failed");
-#ifdef _LOG_TRACE
-		Write_Log(LOG_TYPE_INFO, "WARN- 警告: -109180104. RotateImage GetImageRoi failed");
-#endif
+#ifdef	_PRINT_PROMPT
+		printf("Warning! Unexpected return of GetImageRoiZoomData, return=%d\n", status);
 #endif
 		return 0;
 	}
@@ -599,17 +573,14 @@ void GetQuadrangleSubPix_8u_C1R(unsigned char *const src,const short sSrcImgWidt
 				nY=iys>>MY_SHIFT_BIT;
 				nX=ixs>>MY_SHIFT_BIT;
 
-				// XXX
-				//printf("x=%d, y=%d, src=0x%x\n", x, y, src);
-				//printf("nY=%d, nH1Src=%d, sSrcImgWidth=%d\n", nY, nH1Src, sSrcImgWidth);
-
-				nY>0&&nY<nH1Src?(ptr0 = src + sSrcImgWidth*nY,ptr1 = ptr0 + sSrcImgWidth):(ptr0 = ptr1 = src + (nY < 0 ? 0 : nH1Src)*sSrcImgWidth);
+				//nY>0&&nY<nH1Src?(ptr0 = src + sSrcImgWidth*nY,ptr1 = ptr0 + sSrcImgWidth):(ptr0 = ptr1 = src + (nY < 0 ? 0 : nH1Src)*sSrcImgWidth);
+				nY>=0&&nY<nH1Src?(ptr0 = src + sSrcImgWidth*nY,ptr1 = ptr0 + sSrcImgWidth):(ptr0 = ptr1 = src + (nY < 0 ? 0 : nH1Src)*sSrcImgWidth);
 
 				//if(nX< nW1Src)
-				if(nX > 0 && nX < nW1Src)
+				if(nX >= 0 && nX < nW1Src)
 				{
 					// 若nY<0, ptr0 = ptr1 = src, 若此时nX<0, 则会访问src指针之前的数据，发生访问冲突!!!
-					// 修改上面的条件判断
+					// 修改上面的条件判断, 另外这里nY>0和nX>0是不是应该改为nY>=0和nX>=0
 					p0 = icv8x32fTab_cv[ptr0[nX]+256]*a1 + icv8x32fTab_cv[ptr0[nX+1]+256]*a;
 					p1 = icv8x32fTab_cv[ptr1[nX]+256]*a1 + icv8x32fTab_cv[ptr1[nX+1]+256]*a;
 				}

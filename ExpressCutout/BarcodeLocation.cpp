@@ -15,10 +15,21 @@
 
 #define FNC_AVG_VALUE(v0, c0, v1, c1)	(((v0) * (c0) + (v1) * (c1)) / ((c0) + (c1)))
 
+//////////////////////////////////////////////////////////////////////////
+// [v2.6.1] 图像中存在强反光时，条码提取不完整
+// [v2.6.1] 注释为
+//#define AUTOCONTRAST_THRESHOLD_RATIO_L	(0.05)
+// [v2.6.1] 更改为
 #define AUTOCONTRAST_THRESHOLD_RATIO_L	(0.1)
+// [v2.6.1] 新增为
+#define LOCATE_OUTPUT_MAXWIDTH			(1200)
+#define LOCATE_OUTPUT_MAXHEIGHT			(600)
+#define LOCATE_OUTPUT_MAXAREAS			(360000)
+//////////////////////////////////////////////////////////////////////////
+
 #define GRADHIST_THRE					(36)
 
-// ++++++++++++++++++++++++++++++++++重要改进+++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++重要改进+++++++++++++++++++++++++++++++++++++\\
 // 可以将算法申请的较大内存空间统一为一个内存池，无关联的文件间可以复用同一片内存，节约算法的内存开支 
 
 int gpnLctGradHist[256];
@@ -349,7 +360,6 @@ int LocateBarcodeAreas(unsigned char * img, int wid, int hei, int bloc_size)
 	hist_acc = cvCreateImage(cvSize(360, 220), 8, 3);
 #endif
 
-
 	// 4*4mask对图像进行扫描,记录每个扫描区域的梯度幅值和方向
 	status = FNC_LBC00_GetSampleGradOrient(img, wid, hei, 0, 36, AUTOCONTRAST_THRESHOLD_RATIO_L, &nGradThre);
 	if(1 != status) {
@@ -359,7 +369,6 @@ int LocateBarcodeAreas(unsigned char * img, int wid, int hei, int bloc_size)
 		nRet = status;
 		goto nExit;
 	}
-
 #ifdef _DEBUG_LOCATE
 	unsigned char * pLabl_dbg = 0;
 	unsigned char * pGrad_dbg = gucLctGradient;
@@ -379,7 +388,8 @@ int LocateBarcodeAreas(unsigned char * img, int wid, int hei, int bloc_size)
 		}
 	}
 
-	cvCvtColor(labl_img, show_img2, CV_GRAY2BGR);
+//	cvCvtColor(labl_img, show_img2, CV_GRAY2BGR);
+	cvCopy(show_img, show_img2);
 // 	cvNamedWindow("梯度点标记");
 // 	cvShowImage("梯度点标记", show_img2);
 // 	cvWaitKey();
@@ -595,14 +605,6 @@ int FNC_LBC00_GetSampleGradOrient(unsigned char * const srcimg, int width, int h
 	for(i = 256; i > 0; i--) {
 		nsum += *hist;
 
-#ifdef _DEBUG_LOCATE
-#ifdef _DEBUG_FASTLOCATE
-		if(nsum * 100 / gnLctOGWid / gnLctOGHei >= nthre) {
-			printf("%d%% : 灰度级%d, 精确比例%d%%\n", nthre, i-1, nsum * 100 / gnLctOGWid / gnLctOGHei);
-			nthre++;
-		}
-#endif
-#endif
 		if(nsum >= gnLctGradHistThre) {
 			j = i - 1;
 			break;
@@ -612,12 +614,6 @@ int FNC_LBC00_GetSampleGradOrient(unsigned char * const srcimg, int width, int h
 
 	j = (j > min_thre) ? j : min_thre;
 	*grad_thre = (j < max_thre) ? j : max_thre;
-
-#ifdef _DEBUG
-#ifdef _DEBUG_LOCATE
-	printf("grad_thre = %d\n", *grad_thre);
-#endif
-#endif
 
 #ifdef _DEBUG_LOCATE
 	IplImage * iplImg8u1c_1 = cvCreateImage(cvSize(gnLctOGWid, gnLctOGHei), 8, 1);
@@ -631,6 +627,8 @@ int FNC_LBC00_GetSampleGradOrient(unsigned char * const srcimg, int width, int h
 		}
 	}
 	cvCvtColor(iplImg8u1c_1, show_img, CV_GRAY2BGR);
+	//cvNamedWindow("采样梯度");
+	//cvShowImage("采样梯度", show_img);
 	cvReleaseImage(&iplImg8u1c_1);
 #endif
 
@@ -845,11 +843,11 @@ int FNC_LBC01_GetBlobFeature(int grad_thre)
 	}
 #ifdef _DEBUG_LOCATE
 #ifdef _DEBUG_FASTLOCATE
-	/*
+	
 	printf("effectCnt = %d \n", effectCnt);
 	cvShowImage("DEBUG_FASTLOCATE", show_img2);
-	cvWaitKey();
-	*/
+	//cvWaitKey();
+	
 #endif
 #endif
 
@@ -1771,7 +1769,7 @@ int FNC_LBC02_BlobCluster2Line()
 		cvWaitKey();
 	}
 #endif
-#if	0
+#if	1
 	cvCopy(show_img, show_img3);
 	for(i = line_cnt; i > 0; i--) {
 		cvLine(show_img3, cvPoint(pBlobClusLine[i].line.pt0.x*4+2, pBlobClusLine[i].line.pt0.y*4+2), 
@@ -1782,7 +1780,7 @@ int FNC_LBC02_BlobCluster2Line()
 	printf("Find %d Feature Cluster Lines\n", line_cnt);
 	cvNamedWindow("Feature Cluster Line");
 	cvShowImage("Feature Cluster Line", show_img3);
-	cvWaitKey();
+	//cvWaitKey();
 #endif
 #endif
 #endif
@@ -2066,10 +2064,20 @@ int FNC_LBC03_LineCluster2Area(int line_cnt)
 			continue;
 		}
 
-		// 标记为effcclus
-		effcclus_cnt++;
 		C0  = pBlobClusArea[i].max_intcpt - pBlobClusArea[i].min_intcpt;
 		CT0 = pBlobClusArea[i].max_ontcpt - pBlobClusArea[i].min_ontcpt;
+		// 版本2.3.2修改20170228
+		// 过滤掉超大型区域，优化算法时间
+		//printf("[%d] C0=%d, CT0=%d, AREA=%d\n", i, C0, CT0, C0*CT0);
+		if(C0 > LOCATE_OUTPUT_MAXHEIGHT || CT0 > LOCATE_OUTPUT_MAXWIDTH 
+			|| C0 * CT0 > LOCATE_OUTPUT_MAXAREAS) {
+			pBlobClusArea[i].flag = 0;
+			continue;
+		}
+
+		// 标记为effcclus
+		effcclus_cnt++;
+
 		// 标记形状不符一般条形码特征区域的标识为1
 		//if(C0 > CT0) {
 		if(C0 > 2 * CT0) {

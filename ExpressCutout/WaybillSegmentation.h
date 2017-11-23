@@ -49,7 +49,7 @@ typedef struct flood_fill_classcluster
 	int		flag;	// For processing,代表图片中的第i个联通区域存在
 } FFC;
 
-int WaybillSegment(unsigned char * img, int wid, int hei);
+int WaybillSegment(unsigned char * img, int wid, int hei, RyuRect * bound_box);
 
 int ryuInitFloodFill(RyuSize sz, int max_count);
 

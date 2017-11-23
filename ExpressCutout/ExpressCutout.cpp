@@ -641,9 +641,9 @@ int ExpressCutout_run(char * InputImagePath, char * CutOutPath, char * SuccessPa
 	cvInitFont(&font, CV_FONT_HERSHEY_COMPLEX_SMALL, 1.0, 1.0, 
 		0.0, 1.0, CV_AA);
 	sprintf(txt, "%s", tmpNode.strCodeData);
-	cvPutText(iplRotateImage, txt, cvPoint(10, 10), &font, CV_RGB(255,255,255));
+	cvPutText(iplRotateImage, txt, cvPoint(10, 20), &font, CV_RGB(255,255,255));
 	sprintf(txt, "%s", code);
-	cvPutText(iplRotateImage, txt, cvPoint(10, 40), &font, CV_RGB(255,255,255));
+	cvPutText(iplRotateImage, txt, cvPoint(10, 50), &font, CV_RGB(255,255,255));
 	cvNamedWindow("iplRotateImage");
 	cvShowImage("iplRotateImage", iplRotateImage);
 	cvWaitKey();

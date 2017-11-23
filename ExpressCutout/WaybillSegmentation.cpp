@@ -21,6 +21,11 @@ const int gnXiaoCheFanGuangHeight = 40;
 const int gnXiaoCheFanGuangRangeX = 40;
 const int gnXiaoCheFanGuangRangeY = 40;
 
+const double gfPkgDetectTopBoundRatio = 0.15;
+const double gfPkgDetectTopCenterRatio = 0.1;
+const double gfPkgDetectBottomBoundRatio = 0.15;
+const double gfPkgDetectBottomCenterRatio = 0.1;
+
 const int gfCodeInAreaThreshRatio = 0.8;
 
 /************************************************************************/
@@ -56,15 +61,15 @@ CAN * gtFloodFillCodeAreas = 0;
 int gnFloodFillCodeAreaCount = 0;
 
 
-int WaybillSegment(unsigned char * img, int wid, int hei)
+int WaybillSegment(unsigned char * img, int wid, int hei, RyuRect * bound_box)
 {
 	int nRet = 0, status = 0;
 	int i = 0, j = 0;
 
-	RyuImage * imageIn = 0, * imageProc = 0;
+	RyuImage * imageIn = 0, * imageProc = 0, *imageProc2 = 0;
 
 	double zoomRatio = 0.0;
-	int procWid = 400, procHei = 0;
+	int procWid = 0, procHei = 0;
 
 	unsigned char * pImg = 0;
 	int * pMat = 0, * LabelMat = 0, * ContourMat = 0;
@@ -88,16 +93,34 @@ int WaybillSegment(unsigned char * img, int wid, int hei)
 
 	FFN ffnTmp;
 	int nTmp1 = 0, nTmp2 = 0;
+	int topBound = 0, topCenter = 0, btmBound = 0, btmCenter = 0;
 
+	bound_box->x = bound_box->y = -1;
+	bound_box->width = bound_box->height = 0;
 	imageIn = ryuCreateImageHeader(ryuSize(wid, hei), RYU_DEPTH_8C, 1);
 	imageIn->imagedata = img;
 
-	zoomRatio = procWid * 1.0 / wid;
-	procHei = (int)(hei * zoomRatio);
+	if(wid >= hei) {
+		procWid = 400;
+		zoomRatio = procWid * 1.0 / wid;
+		procHei = (int)(hei * zoomRatio);
+	} else {
+		procHei = 400;
+		zoomRatio = procHei * 1.0 / hei;
+		procWid = (int)(wid * zoomRatio);
+	}
 
 	imageProc = ryuCreateImage(ryuSize(procWid, procHei), RYU_DEPTH_8C, 1);
+	imageProc2 = ryuCreateImage(ryuSize(procWid, procHei), RYU_DEPTH_8C, 1);
 
-	status = ryuResizeImage(imageIn, imageProc);
+	topBound = procHei * gfPkgDetectTopBoundRatio;
+	topCenter = procHei * gfPkgDetectTopCenterRatio;
+	btmBound = procHei * (1.0 - gfPkgDetectBottomBoundRatio);
+	btmCenter = procHei * (1.0 - gfPkgDetectBottomCenterRatio);
+
+	status = ryuResizeImage(imageIn, imageProc2);
+
+	ryuDilate(imageProc2, imageProc);
 
 #ifdef	_DEBUG_
 #ifdef  _DEBUG_FLOODFILL
@@ -106,6 +129,12 @@ int WaybillSegment(unsigned char * img, int wid, int hei)
 	cvNamedWindow("漫水图像1");
 	cvShowImage("漫水图像1", iplimgProc1);
 	cvReleaseImage(&iplimgProc1);
+
+	IplImage * iplimgProcD = cvCreateImage(cvSize(procWid, procHei), 8, 1);
+	uc2IplImageGray(imageProc2->imagedata, iplimgProcD);
+	cvNamedWindow("漫水图像D");
+	cvShowImage("漫水图像D", iplimgProcD);
+	cvReleaseImage(&iplimgProcD);
 #endif
 #endif
 
@@ -133,7 +162,7 @@ int WaybillSegment(unsigned char * img, int wid, int hei)
 	}
 
 	// 找到小于一个漫水区域，则返回
-	if(FFStatisticsCount <= 1) {
+	if(FFStatisticsCount <= 0) {
 		nRet = FFStatisticsCount;
 		goto nExit;
 	}
@@ -149,6 +178,10 @@ int WaybillSegment(unsigned char * img, int wid, int hei)
 	}
 	IplImage * iplimgProc2 = cvCreateImage(cvSize(procWid, procHei), 8, 3);
 	cvZero(iplimgProc2);
+	cvLine(iplimgProc2, cvPoint(0, topBound), cvPoint(procWid, topBound), CV_RGB(192,192,192));
+	cvLine(iplimgProc2, cvPoint(0, btmBound), cvPoint(procWid, btmBound), CV_RGB(192,192,192));
+	cvLine(iplimgProc2, cvPoint(0, topCenter), cvPoint(procWid, topCenter), CV_RGB(128,128,128));
+	cvLine(iplimgProc2, cvPoint(0, btmCenter), cvPoint(procWid, btmCenter), CV_RGB(128,128,128));
 	for(j = 0; j < procHei; j++) {
 		pImg = (unsigned char *)iplimgProc2->imageData + j * iplimgProc2->widthStep;
 		pMat = LabelMat+ j * imageProc->width;
@@ -168,33 +201,54 @@ int WaybillSegment(unsigned char * img, int wid, int hei)
 	}
 	cvNamedWindow("漫水图像2");
 	cvShowImage("漫水图像2", iplimgProc2);
+	//cvWaitKey();
 	cvReleaseImage(&iplimgProc2);
 #endif
 #endif
 
-	// 过滤掉小车金属边缘反光区域
+// 	// 过滤掉小车金属边缘反光区域
+// 	for(i = 0; i < FFStatisticsCount; i++) {
+// 		if(FFStatistics[i].height > gnXiaoCheFanGuangHeight)
+// 			continue;
+// 		if(FFStatistics[i].width < FFStatistics[i].height * 2)
+// 			continue;
+// 		nTmp1 = (FFStatistics[i].min_x + FFStatistics[i].max_x) / 2;
+// 		if(abs(nTmp1 - procWid/2) > gnXiaoCheFanGuangRangeX)
+// 			continue;
+// 		nTmp2 = (FFStatistics[i].min_y + FFStatistics[i].max_y) / 2;
+// 		if(nTmp2 > gnXiaoCheFanGuangRangeY && procHei-nTmp2 < gnXiaoCheFanGuangRangeY)
+// 			continue;
+// 		// 判定为小车金属边缘反光, 删去该节点
+// 		for(j = i+1; j < FFStatisticsCount; j++) {
+// 			FFStatistics[j-1] = FFStatistics[j];
+// 		}
+// 		FFStatisticsCount--;
+// 		i--;
+// 	}
+
+	// 过滤掉小车上下缘位于两车中间的包裹，及小车上端金属边缘反光区域
 	for(i = 0; i < FFStatisticsCount; i++) {
-		if(FFStatistics[i].height > gnXiaoCheFanGuangHeight)
-			continue;
-		if(FFStatistics[i].width < FFStatistics[i].height * 2)
-			continue;
-		nTmp1 = (FFStatistics[i].min_x + FFStatistics[i].max_x) / 2;
-		if(abs(nTmp1 - procWid/2) > gnXiaoCheFanGuangRangeX)
-			continue;
-		nTmp2 = (FFStatistics[i].min_y + FFStatistics[i].max_y) / 2;
-		if(nTmp2 > gnXiaoCheFanGuangRangeY && procHei-nTmp2 < gnXiaoCheFanGuangRangeY)
-			continue;
-		// 判定为小车金属边缘反光, 删去该节点
-		for(j = i+1; j < FFStatisticsCount; j++) {
-			FFStatistics[j-1] = FFStatistics[j];
+		nTmp1 = (FFStatistics[i].min_y + FFStatistics[i].max_y) >> 1;
+		if(FFStatistics[i].max_y < topBound || FFStatistics[i].min_y > btmBound
+			|| nTmp1 < topCenter || nTmp1 > btmCenter) {
+				for(j = i+1; j < FFStatisticsCount; j++) {
+					FFStatistics[j-1] = FFStatistics[j];
+				}
+				FFStatisticsCount--;
+				i--;
 		}
-		FFStatisticsCount--;
-		i--;
 	}
 
 	// 找到小于一个有效漫水区域，则返回
-	if(FFStatisticsCount <= 1) {
+	if(FFStatisticsCount <= 0) {
 		nRet = FFStatisticsCount;
+		goto nExit;
+	} else if(1 == FFStatisticsCount) {
+		bound_box->x = 1.0 * FFStatistics[0].min_x / zoomRatio;
+		bound_box->y = 1.0 * FFStatistics[0].min_y / zoomRatio;
+		bound_box->width = 1.0 * FFStatistics[0].width / zoomRatio;
+		bound_box->height = 1.0 * FFStatistics[0].height / zoomRatio;
+		nRet = 1;
 		goto nExit;
 	}
 
@@ -373,18 +427,30 @@ int WaybillSegment(unsigned char * img, int wid, int hei)
 	cvNamedWindow("漫水图像3");
 	cvShowImage("漫水图像3", iplimgProc3);
 	cvReleaseImage(&iplimgProc3);
-	cvWaitKey();
+	//cvWaitKey();
 #endif
 #endif
 
 	if(classCount > 1) {
 		nRet = 2;
 		goto nExit;
+	} else if(1 == classCount) {
+		bound_box->x = 1.0 * FFClassClusters[1].min_x / zoomRatio;
+		bound_box->y = 1.0 * FFClassClusters[1].min_y / zoomRatio;
+		bound_box->width = 1.0 * FFClassClusters[1].width / zoomRatio;
+		bound_box->height = 1.0 * FFClassClusters[1].height / zoomRatio;
 	}
 
 	nRet = classCount;
 
 nExit:
+	if(imageIn)
+		ryuReleaseImageHeader(&imageIn);
+	if(imageProc)
+		ryuReleaseImage(&imageProc);
+	if(imageProc2)
+		ryuReleaseImage(&imageProc2);
+
 	return nRet;
 }
 

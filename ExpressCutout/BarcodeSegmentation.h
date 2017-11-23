@@ -8,6 +8,7 @@
 typedef struct tagSegmentBarcodeArea
 {
 	int			index;
+	int			score;
 	RyuPoint	corner[4];
 	RyuPoint	corner_ext[4];
 	int			angle;

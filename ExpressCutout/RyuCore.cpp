@@ -677,6 +677,8 @@ int ryuDilate(RyuImage * src, RyuImage * dst)
 	return 1;
 }
 
+
+
 /*
 // Ðý×ª¿¨¿ÇËã·¨
 //Created by pritry

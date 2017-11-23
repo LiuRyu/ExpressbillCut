@@ -1,7 +1,7 @@
 #ifndef _EXPRESS_BARCODE_DETECTION_H
 #define _EXPRESS_BARCODE_DETECTION_H
 
-#define EXPRESS_BARCODE_DETECT_LIBDLL
+//#define EXPRESS_BARCODE_DETECT_LIBDLL
 #ifdef  EXPRESS_BARCODE_DETECT_LIBDLL
 #define EXPRESS_BARCODE_DETECT_LIBDLL extern "C" _declspec(dllexport) 
 #else
@@ -78,9 +78,9 @@ EXPRESS_BARCODE_DETECT_LIBDLL int algorithm_run(int lrning_flag, unsigned char *
 
 EXPRESS_BARCODE_DETECT_LIBDLL void algorithm_release();
 
-int algorithm_setparams(AlgorithmParamSet * paramset);
+EXPRESS_BARCODE_DETECT_LIBDLL int  algorithm_setparams(AlgorithmParamSet * paramset);
 
-void algorithm_resetparams();
+EXPRESS_BARCODE_DETECT_LIBDLL void algorithm_resetparams();
 
 void CoorRelative2Absolute(int centAbs_x, int centAbs_y, int coorRltv_x, int coorRltv_y, 
 	unsigned char rttAngle, int * coorAbs_x, int * coorAbs_y);

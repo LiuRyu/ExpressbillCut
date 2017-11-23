@@ -116,7 +116,8 @@ int RecgCodeI2of5(int * decode_arr, int arr_count, char * code_result, int * cod
 	// 校验位检验，仅限于有校验位的39条码
 	status = CheckDigitVerify_I2of5( gnDecoderSeqArrI2of5, gnDecoderFaithArrI2of5, nSeqCount, 0 );
 	if(1 != status ) {
-#ifdef	_DEBUG_
+#ifdef	_DEBUG_
+
 #ifdef  _DEBUG_DECODER_I2OF5
 		printf("Cannot find I2of5, check digit verification failed, return=%d\n", status);
 #endif
